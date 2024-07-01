@@ -1,5 +1,4 @@
-# SO-project
-Virtual Memory System Simulator
+# Virtual Memory System Simulator
    Using an MMU class, with paging allocate a large virtual memory space (16 MB), and use
    a "swap file" having that size.
    Use a 1 MB buffer as phyisical memory.
