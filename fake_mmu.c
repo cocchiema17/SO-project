@@ -1,6 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
-//#include "bits_macros.h"
+#include "bits_macros.h"
 #include "fake_mmu.h"
 
 LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
@@ -30,4 +31,25 @@ uint32_t getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   uint32_t frame_number=page_entry.frame_number;
   //5. combine the entry of the page table with the offset, and get the physical address
   return (frame_number<<FRAME_NBITS)|linear_address.offset;
+}
+
+MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
+  MMU* mmu = (MMU*)malloc(sizeof(MMU));
+  mmu->segments = (SegmentDescriptor*)malloc(sizeof(SegmentDescriptor) * num_segments);
+  mmu->num_segments = num_segments;
+  mmu->pages = (PageEntry*)malloc(sizeof(PageEntry) * num_pages);
+  mmu->num_pages = num_pages;
+  mmu->ram = (char*)malloc(MAX_MEMORY);
+
+  // inizializzazione delle pagine
+  for(int i = 0; i < num_pages; i++) {
+    mmu->pages[i]->flags = 0;
+  }
+
+  mmu->swap_file = fopen(swap_file, );
+  if (!mmu->swap_file) {
+    printf("Error opening swap file");
+    exit(EXIT_FAILURE);
+  }
+
 }

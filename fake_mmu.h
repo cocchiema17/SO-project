@@ -1,15 +1,20 @@
 #pragma once
 #include <stdint.h>
 
-#ifdef _FAKE_MMU_TEST_
-#include "constants_real.h"
-#endif
+// bits used for addressing
+#define ADDRESS_NBITS 8 //20 
+
+// number of bits used as segment descriptor
+#define SEGMENT_NBITS 2 //4
+
+// number of bits for a page selector
+#define PAGE_NBITS 4    //14
 
 // number of bytes in address space
 #define MAX_MEMORY (1<<ADDRESS_NBITS) // 20 bits = 2^20 B = 1 MB
 
 #define SEGMENT_FLAGS_NBITS 3
-#define PAGE_FLAGS_NBITS 5
+#define PAGE_FLAGS_NBITS 4
 
 // total number of segments
 #define SEGMENTS_NUM (1<<SEGMENT_NBITS)
@@ -28,7 +33,8 @@
 typedef enum {
   Valid=0x1,
   Read=0x2,
-  Write=0x4
+  Write=0x4,
+  Unswappable=0x8
 } SegmentFlags;
 
 typedef struct SegmentDescriptor{
@@ -59,6 +65,8 @@ typedef struct MMU {
   uint32_t num_segments; // number of good segments
   PageEntry *pages;
   uint32_t num_pages;
+  char* ram;
+  FILE* swap_file;
 } MMU;
 
 // applies segmentation to an address and returns linear address
@@ -68,3 +76,5 @@ typedef uint32_t PhysicalAddress;
 
 // applies pagination to an address and returns the physical address
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
+
+MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
