@@ -14,7 +14,7 @@
 #define MAX_MEMORY (1<<ADDRESS_NBITS) // 20 bits = 2^20 B = 1 MB
 
 #define SEGMENT_FLAGS_NBITS 3
-#define PAGE_FLAGS_NBITS 4
+#define PAGE_FLAGS_NBITS 5
 
 // total number of segments
 #define SEGMENTS_NUM (1<<SEGMENT_NBITS)
@@ -34,7 +34,8 @@ typedef enum {
   Valid=0x1,
   Read=0x2,
   Write=0x4,
-  Unswappable=0x8
+  Unswappable=0x8,
+  Reference = 0x10  // Flag for the second chance bit
 } SegmentFlags;
 
 typedef struct SegmentDescriptor{
@@ -67,6 +68,7 @@ typedef struct MMU {
   uint32_t num_pages;
   char* ram;
   FILE* swap_file;
+  int pointer;  // Pointer for the second chance algorithm
 } MMU;
 
 // applies segmentation to an address and returns linear address
@@ -78,3 +80,9 @@ typedef uint32_t PhysicalAddress;
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
 
 MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
+
+void MMU_writeByte(MMU* mmu, int pos, char c);
+
+char MMU_readByte(MMU* mmu, int pos);
+
+void cleanup_mmu(MMU* mmu);

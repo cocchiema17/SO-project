@@ -24,7 +24,7 @@ LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
 }
 
 
-uint32_t getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
+PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   //1. get the page number
   PageEntry page_entry=mmu->pages[linear_address.page_number];
   assert( page_entry.flags & Valid && "invalid page");
@@ -46,10 +46,49 @@ MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
     mmu->pages[i]->flags = 0;
   }
 
-  mmu->swap_file = fopen(swap_file, );
+  // Store the page table at the beginning of the RAM
+  memcpy(mmu->ram, mmu->pages, sizeof(PageEntry) * num_pages);
+
+  mmu->swap_file = fopen(swap_file, "wb+");
   if (!mmu->swap_file) {
     printf("Error opening swap file");
     exit(EXIT_FAILURE);
   }
 
+   mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
+}
+
+void MMU_writeByte(MMU* mmu, int pos, char c) {
+    LogicalAddress logical_address = {
+        .segment_id = (pos >> (PAGE_NBITS + FRAME_NBITS)) & ((1 << SEGMENT_NBITS) - 1),
+        .page_number = (pos >> FRAME_NBITS) & ((1 << PAGE_NBITS) - 1),
+        .offset = pos & ((1 << FRAME_NBITS) - 1)
+    };
+    LinearAddress linear_address = getLinearAddress(mmu, logical_address);
+    PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
+
+    mmu->ram[physical_address] = c;
+    mmu->pages[linear_address.page_number].flags |= Write | Reference;
+}
+
+char MMU_readByte(MMU* mmu, int pos) {
+    LogicalAddress logical_address = {
+        .segment_id = (pos >> (PAGE_NBITS + FRAME_NBITS)) & ((1 << SEGMENT_NBITS) - 1),
+        .page_number = (pos >> FRAME_NBITS) & ((1 << PAGE_NBITS) - 1),
+        .offset = pos & ((1 << FRAME_NBITS) - 1)
+    };
+    LinearAddress linear_address = getLinearAddress(mmu, logical_address);
+    PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
+
+    mmu->pages[linear_address.page_number].flags |= Read | Reference;
+    return mmu->ram[physical_address];
+}
+
+
+void cleanup_mmu(MMU* mmu) {
+    fclose(mmu->swap_file);
+    free(mmu->segments);
+    free(mmu->pages);
+    free(mmu->ram);
+    free(mmu);
 }
