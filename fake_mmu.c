@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
 #include "bits_macros.h"
 #include "fake_mmu.h"
 
@@ -33,7 +30,7 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   return (frame_number<<FRAME_NBITS)|linear_address.offset;
 }
 
-MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
+MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   MMU* mmu = (MMU*)malloc(sizeof(MMU));
   mmu->segments = (SegmentDescriptor*)malloc(sizeof(SegmentDescriptor) * num_segments);
   mmu->num_segments = num_segments;
@@ -43,7 +40,18 @@ MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
 
   // inizializzazione delle pagine
   for(int i = 0; i < num_pages; i++) {
-    mmu->pages[i]->flags = 0;
+    mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
+    mmu->pages[i].flags = 0;
+  }
+
+  // inizializzazione dei segmenti
+  for (uint32_t i = 0; i < num_segments; i++) {
+        if (i == 0)
+            mmu->segments[i].base = 0;
+        else
+            mmu->segments[i].base = mmu->segments[i-1].base + mmu->segments[i-1].limit;
+        mmu->segments[i].limit = PAGES_NUM / SEGMENTS_NUM;
+        mmu->segments[i].flags = Valid;
   }
 
   // Store the page table at the beginning of the RAM
@@ -58,6 +66,7 @@ MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
    mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
 }
 
+/*
 void MMU_writeByte(MMU* mmu, int pos, char c) {
     LogicalAddress logical_address = {
         .segment_id = (pos >> (PAGE_NBITS + FRAME_NBITS)) & ((1 << SEGMENT_NBITS) - 1),
@@ -83,9 +92,10 @@ char MMU_readByte(MMU* mmu, int pos) {
     mmu->pages[linear_address.page_number].flags |= Read | Reference;
     return mmu->ram[physical_address];
 }
+*/
 
 
-void cleanup_mmu(MMU* mmu) {
+void cleanup_MMU(MMU* mmu) {
     fclose(mmu->swap_file);
     free(mmu->segments);
     free(mmu->pages);

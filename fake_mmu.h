@@ -1,5 +1,9 @@
 #pragma once
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#include <string.h>
 
 // bits used for addressing
 #define ADDRESS_NBITS 8 //20 
@@ -79,10 +83,10 @@ typedef uint32_t PhysicalAddress;
 // applies pagination to an address and returns the physical address
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
 
-MMU* init_mmu(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
+MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
 
 void MMU_writeByte(MMU* mmu, int pos, char c);
 
 char MMU_readByte(MMU* mmu, int pos);
 
-void cleanup_mmu(MMU* mmu);
+void cleanup_MMU(MMU* mmu);
