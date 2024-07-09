@@ -1,4 +1,4 @@
-#include "bits_macros.h"
+//#include "bits_macros.h"
 #include "fake_mmu.h"
 
 LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
@@ -64,6 +64,38 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   }
 
    mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
+
+   return mmu;
+}
+
+void printRam(MMU* mmu) {
+  char* pointer = mmu->ram;
+  for (int i = 0; i < MAX_MEMORY; i++) {
+    printf("Ram [%d]: %x\n", i, *pointer);
+    pointer++;
+  }
+}
+
+void generateLogicalAddress(MMU* mmu) {
+
+  printf("Generazione degli indirizzi logici...");
+  for (int s = 0; s < mmu->num_segments; s++) {
+    for (int p = 0; p < mmu->num_pages; p++){
+      for (int o = 0; o < (1 << FRAME_NBITS); o++) {
+        LogicalAddress logical_address = {
+          .segment_id = s,
+          .page_number = p,
+          .offset = o
+        };
+        char c = 'A';
+
+        // inserire sul file la coppia <indirizzo logico, dato>
+        fprintf(mmu->swap_file, "%x%x%x %c\n",
+         logical_address.segment_id, logical_address.page_number, logical_address.offset, c);
+      }
+    } 
+  }
+  printf("completata!\n");
 }
 
 /*

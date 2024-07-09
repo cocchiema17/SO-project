@@ -1,4 +1,4 @@
-#pragma once
+//#pragma once
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,13 +39,13 @@ typedef enum {
   Read=0x2,
   Write=0x4,
   Unswappable=0x8,
-  Reference = 0x10  // Flag for the second chance bit
-} SegmentFlags;
+  Reference = 0x10 
+} PageFlags;
 
 typedef struct SegmentDescriptor{
   uint32_t base: PAGE_NBITS;  
   uint32_t limit: PAGE_NBITS;
-  SegmentFlags flags: SEGMENT_FLAGS_NBITS;
+  uint32_t flags: SEGMENT_FLAGS_NBITS;
 } SegmentDescriptor;
 
 typedef struct LogicalAddress{
@@ -57,12 +57,12 @@ typedef struct LogicalAddress{
 
 typedef struct LinearAddress{
   uint32_t page_number: PAGE_NBITS;
-  uint32_t offset:      FRAME_NBITS;
+  uint32_t offset: FRAME_NBITS;
 } LinearAddress;
 
 typedef struct PageEntry {
   uint32_t frame_number: PAGE_NBITS;
-  uint32_t flags: PAGE_FLAGS_NBITS;
+  PageFlags flags: PAGE_FLAGS_NBITS;
 } PageEntry;
 
 typedef struct MMU {
@@ -85,8 +85,14 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
 
 MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
 
+void printRam(MMU* mmu);
+
+void generateLogicalAddress(MMU* mmu);
+
 void MMU_writeByte(MMU* mmu, int pos, char c);
 
-char MMU_readByte(MMU* mmu, int pos);
+char* MMU_readByte(MMU* mmu, int pos);
+
+void MMU_exception(MMU* mmu, int pos);
 
 void cleanup_MMU(MMU* mmu);
