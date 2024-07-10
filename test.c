@@ -22,10 +22,15 @@ int main() {
     listLogicalAddress[2].page_number = 0;
     listLogicalAddress[2].offset = 0;
 
-    printf("Accesso agli indirizzi logici:\n");
-    for (int i = 0; i < NUM_LOGICAL_ADDRESS; i++)
-        printf("%x%x%x\n",
+    for (int i = 0; i < NUM_LOGICAL_ADDRESS; i++) {
+        printf("Accesso all' indirizzo logico: %x%x%x\n",
          listLogicalAddress[i].segment_id, listLogicalAddress[i].page_number, listLogicalAddress[i].offset);
+        LinearAddress linear_address = getLinearAddress(mmu, listLogicalAddress[i]);
+        printf("Indirizzo lineare: %x%x\n", linear_address.page_number, linear_address.offset);
+        PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
+        char* c = MMU_readByte(mmu, physical_address);
+        printf("Indirizzo fisico: %x -> valore: %c\n", physical_address, *c);
+    }
 
     cleanup_MMU(mmu);
     printf("...finish!\n");

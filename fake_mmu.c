@@ -24,10 +24,18 @@ LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   //1. get the page number
   PageEntry page_entry=mmu->pages[linear_address.page_number];
-  assert( page_entry.flags & Valid && "invalid page");
-  uint32_t frame_number=page_entry.frame_number;
-  //5. combine the entry of the page table with the offset, and get the physical address
-  return (frame_number<<FRAME_NBITS)|linear_address.offset;
+  //assert( page_entry.flags & Valid && "invalid page");
+  if (page_entry.flags & Valid) {
+    page_entry.flags |= Read | Reference;
+    uint32_t frame_number=page_entry.frame_number;
+    //5. combine the entry of the page table with the offset, and get the physical address
+    return (frame_number<<FRAME_NBITS)|linear_address.offset;
+  }
+  else {
+    printf("Page fault\n");
+    MMU_exception(mmu, page_entry.frame_number);
+  }
+  
 }
 
 MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
@@ -41,7 +49,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   // inizializzazione delle pagine
   for(int i = 0; i < num_pages; i++) {
     mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
-    mmu->pages[i].flags = 0;
+    mmu->pages[i].flags = Valid;
   }
 
   // inizializzazione dei segmenti
@@ -57,7 +65,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   // Store the page table at the beginning of the RAM
   memcpy(mmu->ram, mmu->pages, sizeof(PageEntry) * num_pages);
 
-  mmu->swap_file = fopen(swap_file, "wb+");
+  mmu->swap_file = fopen(swap_file, "w+");
   if (!mmu->swap_file) {
     printf("Error opening swap file");
     exit(EXIT_FAILURE);
@@ -71,7 +79,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
 void printRam(MMU* mmu) {
   char* pointer = mmu->ram;
   for (int i = 0; i < MAX_MEMORY; i++) {
-    printf("Ram [%d]: %x\n", i, *pointer);
+    printf("Ram [%d = %x]: %x\n", i, i, *pointer);
     pointer++;
   }
 }
@@ -88,6 +96,7 @@ void generateLogicalAddress(MMU* mmu) {
           .offset = o
         };
         char c = 'A';
+        //printf("%x %x %x\n", s, p, o);
 
         // inserire sul file la coppia <indirizzo logico, dato>
         fprintf(mmu->swap_file, "%x%x%x %c\n",
@@ -98,34 +107,18 @@ void generateLogicalAddress(MMU* mmu) {
   printf("completata!\n");
 }
 
-/*
+char* MMU_readByte(MMU* mmu, int pos) {
+  char* c = (mmu->ram + pos);
+  return c;
+}
+
 void MMU_writeByte(MMU* mmu, int pos, char c) {
-    LogicalAddress logical_address = {
-        .segment_id = (pos >> (PAGE_NBITS + FRAME_NBITS)) & ((1 << SEGMENT_NBITS) - 1),
-        .page_number = (pos >> FRAME_NBITS) & ((1 << PAGE_NBITS) - 1),
-        .offset = pos & ((1 << FRAME_NBITS) - 1)
-    };
-    LinearAddress linear_address = getLinearAddress(mmu, logical_address);
-    PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
 
-    mmu->ram[physical_address] = c;
-    mmu->pages[linear_address.page_number].flags |= Write | Reference;
 }
 
-char MMU_readByte(MMU* mmu, int pos) {
-    LogicalAddress logical_address = {
-        .segment_id = (pos >> (PAGE_NBITS + FRAME_NBITS)) & ((1 << SEGMENT_NBITS) - 1),
-        .page_number = (pos >> FRAME_NBITS) & ((1 << PAGE_NBITS) - 1),
-        .offset = pos & ((1 << FRAME_NBITS) - 1)
-    };
-    LinearAddress linear_address = getLinearAddress(mmu, logical_address);
-    PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
-
-    mmu->pages[linear_address.page_number].flags |= Read | Reference;
-    return mmu->ram[physical_address];
+void MMU_exception(MMU* mmu, int pos) {
+  exit(EXIT_FAILURE);
 }
-*/
-
 
 void cleanup_MMU(MMU* mmu) {
     fclose(mmu->swap_file);
