@@ -15,11 +15,11 @@ int main() {
     listLogicalAddress[0].offset = 0;
 
     listLogicalAddress[1].segment_id = 3;
-    listLogicalAddress[1].page_number = 15;
+    listLogicalAddress[1].page_number = 3;
     listLogicalAddress[1].offset = 15;
 
-    listLogicalAddress[2].segment_id = 0;
-    listLogicalAddress[2].page_number = 0;
+    listLogicalAddress[2].segment_id = 3;
+    listLogicalAddress[2].page_number = 3;
     listLogicalAddress[2].offset = 0;
 
     for (int i = 0; i < NUM_LOGICAL_ADDRESS; i++) {

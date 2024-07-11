@@ -1,4 +1,3 @@
-//#include "bits_macros.h"
 #include "fake_mmu.h"
 
 LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
@@ -26,7 +25,7 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   PageEntry page_entry=mmu->pages[linear_address.page_number];
   //assert( page_entry.flags & Valid && "invalid page");
   if (page_entry.flags & Valid) {
-    page_entry.flags |= Read | Reference;
+    mmu->pages[linear_address.page_number].flags |= Read | Reference;
     uint32_t frame_number=page_entry.frame_number;
     //5. combine the entry of the page table with the offset, and get the physical address
     return (frame_number<<FRAME_NBITS)|linear_address.offset;
@@ -35,21 +34,25 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
     printf("Page fault\n");
     MMU_exception(mmu, page_entry.frame_number);
   }
-  
 }
 
 MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   MMU* mmu = (MMU*)malloc(sizeof(MMU));
+  assert(mmu != NULL && "Error mmu malloc");
   mmu->segments = (SegmentDescriptor*)malloc(sizeof(SegmentDescriptor) * num_segments);
+  assert(mmu->segments != NULL && "Error segments malloc");
   mmu->num_segments = num_segments;
   mmu->pages = (PageEntry*)malloc(sizeof(PageEntry) * num_pages);
+  assert(mmu->pages != NULL && "Error pages malloc");
   mmu->num_pages = num_pages;
   mmu->ram = (char*)malloc(MAX_MEMORY);
+  assert(mmu->ram != NULL && "Error ram malloc");
+  mmu->used_memory = 0;
 
   // inizializzazione delle pagine
   for(int i = 0; i < num_pages; i++) {
     mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
-    mmu->pages[i].flags = Valid;
+    mmu->pages[i].flags = Valid | Unswappable;
   }
 
   // inizializzazione dei segmenti
@@ -64,6 +67,8 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
 
   // Store the page table at the beginning of the RAM
   memcpy(mmu->ram, mmu->pages, sizeof(PageEntry) * num_pages);
+  mmu->used_memory = sizeof(PageEntry) * num_pages;
+  mmu->pages = (PageEntry*) mmu->ram;
 
   mmu->swap_file = fopen(swap_file, "w+");
   if (!mmu->swap_file) {
@@ -84,11 +89,15 @@ void printRam(MMU* mmu) {
   }
 }
 
+int isRamFull(MMU* mmu) {
+  return (mmu->used_memory >= MAX_MEMORY);
+}
+
 void generateLogicalAddress(MMU* mmu) {
 
   printf("Generazione degli indirizzi logici...");
   for (int s = 0; s < mmu->num_segments; s++) {
-    for (int p = 0; p < mmu->num_pages; p++){
+    for (int p = 0; p < mmu->segments[s].limit; p++){
       for (int o = 0; o < (1 << FRAME_NBITS); o++) {
         LogicalAddress logical_address = {
           .segment_id = s,
@@ -108,12 +117,18 @@ void generateLogicalAddress(MMU* mmu) {
 }
 
 char* MMU_readByte(MMU* mmu, int pos) {
-  char* c = (mmu->ram + pos);
-  return c;
+  assert(pos >= 0 && pos < MAX_MEMORY && "Invalid physical address");
+  char* pointer = mmu->ram;
+  pointer += pos;  
+  return pointer;
 }
 
 void MMU_writeByte(MMU* mmu, int pos, char c) {
-
+  assert(pos >= 0 && pos < MAX_MEMORY && "Invalid physical address");
+  char* pointer = mmu->ram;
+  pointer += pos;
+  *pointer = c;
+  mmu->used_memory++;
 }
 
 void MMU_exception(MMU* mmu, int pos) {
@@ -123,7 +138,6 @@ void MMU_exception(MMU* mmu, int pos) {
 void cleanup_MMU(MMU* mmu) {
     fclose(mmu->swap_file);
     free(mmu->segments);
-    free(mmu->pages);
     free(mmu->ram);
     free(mmu);
 }

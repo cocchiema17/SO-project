@@ -1,4 +1,3 @@
-//#pragma once
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +70,7 @@ typedef struct MMU {
   PageEntry *pages;
   uint32_t num_pages;
   char* ram;
+  uint32_t used_memory; // Contatore della memoria utilizzata
   FILE* swap_file;
   int pointer;  // Pointer for the second chance algorithm
 } MMU;
@@ -87,6 +87,9 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
 
 void printRam(MMU* mmu);
 
+int isRamFull(MMU* mmu);
+
+// generation of valid logical addresses
 void generateLogicalAddress(MMU* mmu);
 
 char* MMU_readByte(MMU* mmu, int pos);
