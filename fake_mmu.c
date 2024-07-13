@@ -52,7 +52,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   // inizializzazione delle pagine
   for(int i = 0; i < num_pages; i++) {
     mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
-    mmu->pages[i].flags = Valid | Unswappable;
+    mmu->pages[i].flags = Valid;
   }
 
   // inizializzazione dei segmenti
@@ -81,6 +81,24 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
    return mmu;
 }
 
+void printSegmentsTable(MMU* mmu) {
+  SegmentDescriptor* pointer = mmu->segments;
+  for (int i = 0; i < mmu->num_segments; i++) {
+    printf("Segment %d: base = %d, limit = %d, flags = %d\n",
+      i, pointer->base, pointer->limit, pointer->flags);
+    pointer++;
+  }
+}
+
+void printPagesTable(MMU* mmu) {
+  PageEntry* pointer = mmu->pages;
+  for (int i = 0; i < mmu->num_pages; i++) {
+    printf("Page %d: frame_number = %d, flags = %d\n",
+      i, pointer->frame_number, pointer->flags);
+    pointer++;
+  }
+}
+
 void printRam(MMU* mmu) {
   char* pointer = mmu->ram;
   for (int i = 0; i < MAX_MEMORY; i++) {
@@ -98,7 +116,7 @@ void generateLogicalAddress(MMU* mmu) {
   printf("Generazione degli indirizzi logici...");
   for (int s = 0; s < mmu->num_segments; s++) {
     for (int p = 0; p < mmu->segments[s].limit; p++){
-      for (int o = 0; o < (1 << FRAME_NBITS); o++) {
+      for (int o = 0; o < PAGE_SIZE; o++) {
         LogicalAddress logical_address = {
           .segment_id = s,
           .page_number = p,

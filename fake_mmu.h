@@ -16,7 +16,7 @@
 // number of bytes in address space
 #define MAX_MEMORY (1<<ADDRESS_NBITS) // 20 bits = 2^20 B = 1 MB
 
-#define SEGMENT_FLAGS_NBITS 3
+#define SEGMENT_FLAGS_NBITS 1
 #define PAGE_FLAGS_NBITS 5
 
 // total number of segments
@@ -84,6 +84,10 @@ typedef uint32_t PhysicalAddress;
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
 
 MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file);
+
+void printSegmentsTable(MMU* mmu);
+
+void printPagesTable(MMU* mmu);
 
 void printRam(MMU* mmu);
 

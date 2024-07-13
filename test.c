@@ -4,6 +4,8 @@
 int main() {
     printf("Starting...\n");
     MMU* mmu = init_MMU(SEGMENTS_NUM, PAGES_NUM, "swapfile.txt");
+    printSegmentsTable(mmu);
+    printPagesTable(mmu);
     printRam(mmu);
 
     generateLogicalAddress(mmu);
