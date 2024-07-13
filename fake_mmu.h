@@ -102,4 +102,6 @@ void MMU_writeByte(MMU* mmu, int pos, char c);
 
 void MMU_exception(MMU* mmu, int pos);
 
+void secondChance(MMU* mmu);
+
 void cleanup_MMU(MMU* mmu);

@@ -31,7 +31,6 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
     return (frame_number<<FRAME_NBITS)|linear_address.offset;
   }
   else {
-    printf("Page fault\n");
     MMU_exception(mmu, page_entry.frame_number);
   }
 }
@@ -76,9 +75,9 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
     exit(EXIT_FAILURE);
   }
 
-   mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
+  mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
 
-   return mmu;
+  return mmu;
 }
 
 void printSegmentsTable(MMU* mmu) {
@@ -150,7 +149,22 @@ void MMU_writeByte(MMU* mmu, int pos, char c) {
 }
 
 void MMU_exception(MMU* mmu, int pos) {
-  exit(EXIT_FAILURE);
+  printf("Page fault at frame number %d\n", pos);
+  if (isRamFull(mmu)) {
+    printf("RAM is full, swapping...\n");
+    secondChance(mmu);  // second chance algorithm
+  }
+  // load the frame from file to ram and update the page table
+}
+
+void secondChance(MMU* mmu) {
+  PageEntry* page = mmu->pages + mmu->pointer;
+  while (page->flags & Unswappable || page->flags & Reference) { 
+    page->flags ^= Reference;
+    mmu->pointer = (mmu->pointer + 1) % mmu->num_pages;
+  }
+  // frame finded
+  // load the frame from file to ram and update the page table
 }
 
 void cleanup_MMU(MMU* mmu) {
