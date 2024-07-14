@@ -7,12 +7,7 @@ int main() {
   printPagesTable(mmu);
   //printRam(mmu);
 
-  // ciclo per riempire la ram
-  /*
-  for (int i = PAGES_NUM * sizeof(PageEntry); i < MAX_MEMORY; i++) {
-    MMU_writeByte(mmu, i, 'a');
-  }
-  */
+  /*TESTING SWAP IN
 
   // 300
   LogicalAddress logical_address = {3, 0, 0};
@@ -69,6 +64,29 @@ int main() {
 
   printPagesTable(mmu);
   printRam(mmu);
+
+  */
+
+
+  // TESTING SWAP OUT 
+  // fill the page table
+  for (int s = 0; s < mmu->num_segments; s++) {
+    for (int p = 0; p < mmu->segments[s].limit; p++) {
+      LogicalAddress logical_address = {
+        .segment_id = s,
+        .page_number = p,
+        .offset = 0
+      };
+      LinearAddress linear_address = getLinearAddress(mmu, logical_address);
+      PhysicalAddress physical_address = getPhysicalAddress(mmu, linear_address);
+      char* c = MMU_readByte(mmu, physical_address);
+      printf("c = %c\n", *c);
+    }
+  }
+
+  printPagesTable(mmu);
+  printRam(mmu);
+
 
   printf("Page fault: %d\n", mmu->pageFault);
 
