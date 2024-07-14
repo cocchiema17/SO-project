@@ -81,7 +81,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) 
   mmu->used_memory = sizeof(PageEntry) * num_pages;
   mmu->pages = (PageEntry*) mmu->ram; 
 
-  mmu->swap_file = fopen(swap_file, "wb+");
+  mmu->swap_file = fopen(swap_file, "r+");
   if (!mmu->swap_file) {
     printf("Error opening swap file");
     exit(EXIT_FAILURE);
@@ -156,7 +156,7 @@ void MMU_exception(MMU* mmu, int page_number) {
 
     // Update the page table entry
     mmu->pages[page_number].frame_number = mmu->pages[frame_to_swap].frame_number;
-    mmu->pages[page_number].flags = Valid | Write | Reference;
+    mmu->pages[page_number].flags = Valid | Reference;
 
     // Swap in the required page
     swap_in(mmu, mmu->pages[page_number].frame_number);
@@ -166,7 +166,7 @@ void MMU_exception(MMU* mmu, int page_number) {
   else {
     printf("Ram is not full\n");
     swap_in(mmu, mmu->pages[page_number].frame_number);
-    mmu->pages[page_number].flags = Valid | Write | Reference;
+    mmu->pages[page_number].flags = Valid | Reference;
   }
 }
 
