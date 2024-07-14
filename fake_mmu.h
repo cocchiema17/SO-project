@@ -94,9 +94,6 @@ void printRam(MMU* mmu);
 
 int isRamFull(MMU* mmu);
 
-// generation of valid logical addresses
-//void generateLogicalAddress(MMU* mmu);
-
 char* MMU_readByte(MMU* mmu, int pos);
 
 void MMU_writeByte(MMU* mmu, int pos, char c);

@@ -1,6 +1,8 @@
 #include "fake_mmu.h"
 
 LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
+  printf("Logical address: %x%x%x ", 
+    logical_address.segment_id, logical_address.page_number, logical_address.offset);
   //2. check if the segment is in the segment table
   assert (logical_address.segment_id < mmu->num_segments && "segment out of bounds" );
   
@@ -16,23 +18,27 @@ LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
   linear_address.offset=logical_address.offset;
 
   //5. return the address
+  printf("=> Linear address: %x%x\n", linear_address.page_number, linear_address.offset);
   return linear_address;
 }
 
 
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
-    PageEntry page_entry = mmu->pages[linear_address.page_number];
+  printf("Linear address: %x%x ", linear_address.page_number, linear_address.offset);
+  PageEntry page_entry = mmu->pages[linear_address.page_number];
 
-    if (!(page_entry.flags & Valid)) {
-        MMU_exception(mmu, linear_address.page_number);
-        page_entry = mmu->pages[linear_address.page_number];
-    }
+  if (!(page_entry.flags & Valid)) {
+    MMU_exception(mmu, linear_address.page_number);
+    page_entry = mmu->pages[linear_address.page_number];
+  }
 
-    page_entry.flags |= Read | Reference;
-    mmu->pages[linear_address.page_number] = page_entry;
+  page_entry.flags |= Read | Reference;
+  mmu->pages[linear_address.page_number] = page_entry;
 
-    uint32_t frame_number = page_entry.frame_number;
-    return (frame_number << FRAME_NBITS) | linear_address.offset;
+  uint32_t frame_number = page_entry.frame_number;
+  PhysicalAddress physicalAddress = (frame_number << FRAME_NBITS) | linear_address.offset;
+  printf("=> Physical address: %x = %d\n", physicalAddress, physicalAddress);
+  return physicalAddress;
 }
 
 MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) {
@@ -73,8 +79,7 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) 
   // Store the page table at the beginning of the RAM
   memcpy(mmu->ram, mmu->pages, sizeof(PageEntry) * num_pages);
   mmu->used_memory = sizeof(PageEntry) * num_pages;
-  mmu->pages = (PageEntry*) mmu->ram;
-  //mmu->ram = (char*) mmu->pages + sizeof(PageEntry) * num_pages; 
+  mmu->pages = (PageEntry*) mmu->ram; 
 
   mmu->swap_file = fopen(swap_file, "wb+");
   if (!mmu->swap_file) {
@@ -108,7 +113,7 @@ void printPagesTable(MMU* mmu) {
 void printRam(MMU* mmu) {
   char* pointer = mmu->ram;
   for (int i = 0; i < MAX_MEMORY; i++) {
-    printf("Ram [%d = %x]: %x\n", i, i, *pointer);
+    printf("Ram [%d = %x]: %x = %c\n", i, i, *pointer, *pointer);
     pointer++;
   }
 }
@@ -116,31 +121,6 @@ void printRam(MMU* mmu) {
 int isRamFull(MMU* mmu) {
   return (mmu->used_memory >= MAX_MEMORY);
 }
-
-/*
-void generateLogicalAddress(MMU* mmu) {
-
-  printf("Generazione degli indirizzi logici...");
-  for (int s = 0; s < mmu->num_segments; s++) {
-    for (int p = 0; p < mmu->segments[s].limit; p++){
-      for (int o = 0; o < PAGE_SIZE; o++) {
-        LogicalAddress logical_address = {
-          .segment_id = s,
-          .page_number = p,
-          .offset = o
-        };
-        char c = 'A';
-        //printf("%x %x %x\n", s, p, o);
-
-        // inserire sul file la coppia <indirizzo logico, dato>
-        fprintf(mmu->swap_file, "%x%x%x %c\n",
-         logical_address.segment_id, logical_address.page_number, logical_address.offset, c);
-      }
-    } 
-  }
-  printf("completata!\n");
-}
-*/
 
 char* MMU_readByte(MMU* mmu, int pos) {
   assert(pos >= 0 && pos < MAX_MEMORY && "Invalid physical address");
@@ -169,12 +149,14 @@ void MMU_exception(MMU* mmu, int page_number) {
       frame_to_swap = (frame_to_swap + 1) % PAGES_NUM;
     }
 
+    printf("Frame victim: %d\n", frame_to_swap);
+
     // Swap out the selected frame
     swap_out(mmu, mmu->pages[frame_to_swap].frame_number);
 
     // Update the page table entry
     mmu->pages[page_number].frame_number = mmu->pages[frame_to_swap].frame_number;
-    mmu->pages[page_number].flags = Valid | Reference;
+    mmu->pages[page_number].flags = Valid | Write | Reference;
 
     // Swap in the required page
     swap_in(mmu, mmu->pages[page_number].frame_number);
@@ -184,6 +166,7 @@ void MMU_exception(MMU* mmu, int page_number) {
   else {
     printf("Ram is not full\n");
     swap_in(mmu, mmu->pages[page_number].frame_number);
+    mmu->pages[page_number].flags = Valid | Write | Reference;
   }
 }
 
