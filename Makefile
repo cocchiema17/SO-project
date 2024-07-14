@@ -7,7 +7,7 @@ BINS=fake_mmu_test	#memory_access_test fake_linking memory_manager_test
 
 OBJS=fake_mmu.o	#linked_list.o frame_item.o segment_item.o process_memory_layout.o memory_manager.o
 
-HEADERS=fake_mmu.h bits_macros.h	#linked_list.h constants_real.h constants_small.h frame_item.h segment_item.h process_memory_layout.h memory_manager.h
+HEADERS=fake_mmu.h #bits_macros.h linked_list.h constants_real.h constants_small.h frame_item.h segment_item.h process_memory_layout.h memory_manager.h
 
 #LIBS=libmemory_manager.a
 

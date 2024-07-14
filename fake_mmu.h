@@ -73,6 +73,7 @@ typedef struct MMU {
   uint32_t used_memory; // Contatore della memoria utilizzata
   FILE* swap_file;
   int pointer;  // Pointer for the second chance algorithm
+  int pageFault;
 } MMU;
 
 // applies segmentation to an address and returns linear address
@@ -94,14 +95,16 @@ void printRam(MMU* mmu);
 int isRamFull(MMU* mmu);
 
 // generation of valid logical addresses
-void generateLogicalAddress(MMU* mmu);
+//void generateLogicalAddress(MMU* mmu);
 
 char* MMU_readByte(MMU* mmu, int pos);
 
 void MMU_writeByte(MMU* mmu, int pos, char c);
 
-void MMU_exception(MMU* mmu, int pos);
+void MMU_exception(MMU* mmu, int page_number);
 
-void secondChance(MMU* mmu);
+void swap_out(MMU* mmu, int frame_number);
+
+void swap_in(MMU* mmu, int frame_number);
 
 void cleanup_MMU(MMU* mmu);

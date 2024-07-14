@@ -21,21 +21,21 @@ LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
 
 
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
-  //1. get the page number
-  PageEntry page_entry=mmu->pages[linear_address.page_number];
-  //assert( page_entry.flags & Valid && "invalid page");
-  if (page_entry.flags & Valid) {
-    mmu->pages[linear_address.page_number].flags |= Read | Reference;
-    uint32_t frame_number=page_entry.frame_number;
-    //5. combine the entry of the page table with the offset, and get the physical address
-    return (frame_number<<FRAME_NBITS)|linear_address.offset;
-  }
-  else {
-    MMU_exception(mmu, page_entry.frame_number);
-  }
+    PageEntry page_entry = mmu->pages[linear_address.page_number];
+
+    if (!(page_entry.flags & Valid)) {
+        MMU_exception(mmu, linear_address.page_number);
+        page_entry = mmu->pages[linear_address.page_number];
+    }
+
+    page_entry.flags |= Read | Reference;
+    mmu->pages[linear_address.page_number] = page_entry;
+
+    uint32_t frame_number = page_entry.frame_number;
+    return (frame_number << FRAME_NBITS) | linear_address.offset;
 }
 
-MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
+MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) {
   MMU* mmu = (MMU*)malloc(sizeof(MMU));
   assert(mmu != NULL && "Error mmu malloc");
   mmu->segments = (SegmentDescriptor*)malloc(sizeof(SegmentDescriptor) * num_segments);
@@ -47,11 +47,17 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   mmu->ram = (char*)malloc(MAX_MEMORY);
   assert(mmu->ram != NULL && "Error ram malloc");
   mmu->used_memory = 0;
+  mmu->pageFault = 0;
 
   // inizializzazione delle pagine
+  int unswappable_pages = num_pages / sizeof(PageEntry);
   for(int i = 0; i < num_pages; i++) {
-    mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
-    mmu->pages[i].flags = Valid;
+    //mmu->pages[i].frame_number = PAGES_NUM - i - 1; // ordine inverso
+    mmu->pages[i].frame_number = i;
+    if (i < unswappable_pages)
+      mmu->pages[i].flags |= Valid | Unswappable;
+    else
+      mmu->pages[i].flags = 0;
   }
 
   // inizializzazione dei segmenti
@@ -68,8 +74,9 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file){
   memcpy(mmu->ram, mmu->pages, sizeof(PageEntry) * num_pages);
   mmu->used_memory = sizeof(PageEntry) * num_pages;
   mmu->pages = (PageEntry*) mmu->ram;
+  //mmu->ram = (char*) mmu->pages + sizeof(PageEntry) * num_pages; 
 
-  mmu->swap_file = fopen(swap_file, "w+");
+  mmu->swap_file = fopen(swap_file, "wb+");
   if (!mmu->swap_file) {
     printf("Error opening swap file");
     exit(EXIT_FAILURE);
@@ -110,6 +117,7 @@ int isRamFull(MMU* mmu) {
   return (mmu->used_memory >= MAX_MEMORY);
 }
 
+/*
 void generateLogicalAddress(MMU* mmu) {
 
   printf("Generazione degli indirizzi logici...");
@@ -132,6 +140,7 @@ void generateLogicalAddress(MMU* mmu) {
   }
   printf("completata!\n");
 }
+*/
 
 char* MMU_readByte(MMU* mmu, int pos) {
   assert(pos >= 0 && pos < MAX_MEMORY && "Invalid physical address");
@@ -148,23 +157,48 @@ void MMU_writeByte(MMU* mmu, int pos, char c) {
   mmu->used_memory++;
 }
 
-void MMU_exception(MMU* mmu, int pos) {
-  printf("Page fault at frame number %d\n", pos);
-  if (isRamFull(mmu)) {
-    printf("RAM is full, swapping...\n");
-    secondChance(mmu);  // second chance algorithm
+void MMU_exception(MMU* mmu, int page_number) {
+  printf("Page fault at page number %d\n", page_number);
+  mmu->pageFault++;
+  if(isRamFull(mmu)) {
+    printf("Ram is full\n");
+    int frame_to_swap = mmu->pointer;
+    // second chance algorithm
+    while (mmu->pages[frame_to_swap].flags & Unswappable || (mmu->pages[frame_to_swap].flags & Reference)) {
+      mmu->pages[frame_to_swap].flags ^= Reference;
+      frame_to_swap = (frame_to_swap + 1) % PAGES_NUM;
+    }
+
+    // Swap out the selected frame
+    swap_out(mmu, mmu->pages[frame_to_swap].frame_number);
+
+    // Update the page table entry
+    mmu->pages[page_number].frame_number = mmu->pages[frame_to_swap].frame_number;
+    mmu->pages[page_number].flags = Valid | Reference;
+
+    // Swap in the required page
+    swap_in(mmu, mmu->pages[page_number].frame_number);
+
+    mmu->pointer = (frame_to_swap + 1) % PAGES_NUM;
   }
-  // load the frame from file to ram and update the page table
+  else {
+    printf("Ram is not full\n");
+    swap_in(mmu, mmu->pages[page_number].frame_number);
+  }
 }
 
-void secondChance(MMU* mmu) {
-  PageEntry* page = mmu->pages + mmu->pointer;
-  while (page->flags & Unswappable || page->flags & Reference) { 
-    page->flags ^= Reference;
-    mmu->pointer = (mmu->pointer + 1) % mmu->num_pages;
-  }
-  // frame finded
-  // load the frame from file to ram and update the page table
+void swap_out(MMU* mmu, int frame_number) {
+  printf("Swapping out frame %d to swap file\n", frame_number);
+  fseek(mmu->swap_file, frame_number * PAGE_SIZE, SEEK_SET);
+  fwrite(&mmu->ram[frame_number * PAGE_SIZE], 1, PAGE_SIZE, mmu->swap_file);
+  fflush(mmu->swap_file);
+  memset(&mmu->ram[frame_number * PAGE_SIZE], 0, PAGE_SIZE); // Clear the RAM space after swapping out
+}
+
+void swap_in(MMU* mmu, int frame_number) {
+  printf("Swapping in frame %d from swap file\n", frame_number);
+  fseek(mmu->swap_file, frame_number * PAGE_SIZE, SEEK_SET);
+  fread(&mmu->ram[frame_number * PAGE_SIZE], 1, PAGE_SIZE, mmu->swap_file);
 }
 
 void cleanup_MMU(MMU* mmu) {
