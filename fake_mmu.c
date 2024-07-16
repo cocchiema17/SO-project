@@ -1,28 +1,5 @@
 #include "fake_mmu.h"
 
-LinearAddress getLinearAddress(MMU* mmu, LogicalAddress logical_address){
-  printf("Logical address: %x%x%x ", 
-    logical_address.segment_id, logical_address.page_number, logical_address.offset);
-  //2. check if the segment is in the segment table
-  assert (logical_address.segment_id < mmu->num_segments && "segment out of bounds" );
-  
-  //2. select the descriptor from the mmu table
-  SegmentDescriptor descriptor = mmu->segments[logical_address.segment_id];
-
-  //3. see if the segment is valid
-  assert((descriptor.flags) & Valid && "invalid_segment");
-  assert((logical_address.page_number < descriptor.limit) && "out_of_segment_limit");
-
-  LinearAddress linear_address;
-  linear_address.page_number = descriptor.base+logical_address.page_number;
-  linear_address.offset = logical_address.offset;
-
-  //5. return the address
-  printf("=> Linear address: %x%x\n", linear_address.page_number, linear_address.offset);
-  return linear_address;
-}
-
-
 PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   printf("Linear address: %x%x ", linear_address.page_number, linear_address.offset);
   PageEntry page_entry = mmu->pages[linear_address.page_number];
@@ -41,39 +18,35 @@ PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address) {
   return physicalAddress;
 }
 
-MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) {
+MMU* init_MMU(uint32_t num_pages, const char* swap_file) {
   MMU* mmu = (MMU*)malloc(sizeof(MMU));
   assert(mmu != NULL && "Error mmu malloc");
-  mmu->segments = (SegmentDescriptor*)malloc(sizeof(SegmentDescriptor) * num_segments);
-  assert(mmu->segments != NULL && "Error segments malloc");
-  mmu->num_segments = num_segments;
   mmu->pages = (PageEntry*)malloc(sizeof(PageEntry) * num_pages);
   assert(mmu->pages != NULL && "Error pages malloc");
   mmu->num_pages = num_pages;
   mmu->ram = (char*)malloc(MAX_MEMORY);
   assert(mmu->ram != NULL && "Error ram malloc");
+  // frameInRam = MAX_MEMORY / PAGE_SIZE = 1 MB / 4 KB = 256 frames
+  int frameInRam =  MAX_MEMORY / PAGE_SIZE;
+  printf("Frames in ram = %d\n", frameInRam);
+  mmu->pagesInRam = (PageEntry*)malloc(sizeof(PageEntry) * frameInRam);
+  assert(mmu->pagesInRam != NULL && "Error pagesInRam malloc");
   mmu->used_memory = 0;
   mmu->pageFault = 0;
 
   // initialization of pages
-  int unswappable_pages = num_pages / sizeof(PageEntry);
+  // size of Page table = sizeof(PageEntry) * num_pages = 4 B * 4096 = 16384 B = 16 KB => the first occupied frames are size of Page table / PAGE_SIZE = 16 KB / 4 KB = 4 pages
+  int unswappable_pages = sizeof(PageEntry) * num_pages / PAGE_SIZE;
+  printf("Unswappable pages = %d\n", unswappable_pages);
   for(int i = 0; i < num_pages; i++) {
-    //mmu->pages[i].frame_number = PAGES_NUM - i - 1; // reverse order
-    mmu->pages[i].frame_number = i;
-    if (i < unswappable_pages)
-      mmu->pages[i].flags |= Valid | Unswappable;
+    if (i < unswappable_pages) {
+      mmu->pages[i].frame_number = i;
+      mmu->pages[i].flags = Unswappable;
+      // initialization of pagesInRam
+      mmu->pagesInRam[i] = mmu->pages[i];
+    }
     else
       mmu->pages[i].flags = 0;
-  }
-
-  // initialization of segments
-  for (uint32_t i = 0; i < num_segments; i++) {
-    if (i == 0)
-      mmu->segments[i].base = 0;
-    else
-      mmu->segments[i].base = mmu->segments[i-1].base + mmu->segments[i-1].limit;
-    mmu->segments[i].limit = PAGES_NUM / SEGMENTS_NUM;
-    mmu->segments[i].flags = Valid;
   }
 
   // Store the page table at the beginning of the RAM
@@ -87,23 +60,24 @@ MMU* init_MMU(uint32_t num_segments, uint32_t num_pages, const char* swap_file) 
     exit(EXIT_FAILURE);
   }
 
-  mmu->pointer = 0;  // Initialize pointer for the second chance algorithm
-
+  mmu->pointer = 0;
+  
   return mmu;
-}
-
-void printSegmentsTable(MMU* mmu) {
-  SegmentDescriptor* pointer = mmu->segments;
-  for (int i = 0; i < mmu->num_segments; i++) {
-    printf("Segment %d: base = %d, limit = %d, flags = %d\n",
-      i, pointer->base, pointer->limit, pointer->flags);
-    pointer++;
-  }
 }
 
 void printPagesTable(MMU* mmu) {
   PageEntry* pointer = mmu->pages;
   for (int i = 0; i < mmu->num_pages; i++) {
+    printf("Page %d: frame_number = %d, flags = %d\n",
+      i, pointer->frame_number, pointer->flags);
+    pointer++;
+  }
+}
+
+void printPagesTableInRam(MMU* mmu) {
+  PageEntry* pointer = mmu->pagesInRam;
+  int frameInRam =  MAX_MEMORY / PAGE_SIZE;
+  for (int i = 0; i < frameInRam; i++) {
     printf("Page %d: frame_number = %d, flags = %d\n",
       i, pointer->frame_number, pointer->flags);
     pointer++;
@@ -185,7 +159,7 @@ void swap_in(MMU* mmu, int frame_number) {
 
 void cleanup_MMU(MMU* mmu) {
   fclose(mmu->swap_file);
-  free(mmu->segments);
   free(mmu->ram);
+  free(mmu->pagesInRam);
   free(mmu);
 }
