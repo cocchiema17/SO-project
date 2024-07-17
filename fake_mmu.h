@@ -49,7 +49,6 @@ typedef struct MMU {
   int busyFramesInRam;  // number of frames in ram that are currently in use
   PageEntry* pagesInRam;  // Pages stored in RAM, on which the second chance algorithm will be performed
   FILE* swap_file;
-  int pointer;  // To put out
   int pageFault;
 } MMU;
 

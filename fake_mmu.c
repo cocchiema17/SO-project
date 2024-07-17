@@ -41,8 +41,6 @@ MMU* init_MMU(uint32_t num_pages, const char* swap_file) {
     printf("Error opening swap file");
     exit(EXIT_FAILURE);
   }
-
-  mmu->pointer = 0;
   
   return mmu;
 }
@@ -124,7 +122,7 @@ void MMU_exception(MMU* mmu, LinearAddress pos) {
   assert(!(mmu->pages[pos.page_number].flags & Unswappable) && "Page table in RAM cannot be accessed for reading or writing");
   if(isRamFull(mmu)) {
     printf("Ram is full\n");
-    int frame_to_swap = mmu->pointer;
+    int frame_to_swap = 0; 
     int frameInRam =  MAX_MEMORY / PAGE_SIZE;
     // second chance algorithm
     while (mmu->pagesInRam[frame_to_swap].flags & Unswappable || (mmu->pagesInRam[frame_to_swap].flags & Reference)) {
@@ -145,7 +143,7 @@ void MMU_exception(MMU* mmu, LinearAddress pos) {
     // Swap in the required page
     swap_in(mmu, pos.page_number, frame_to_swap);
 
-    mmu->pointer = (frame_to_swap + 1) % frameInRam;
+    frame_to_swap = (frame_to_swap + 1) % frameInRam;
   }
   else {
     printf("Ram is not full\n");
