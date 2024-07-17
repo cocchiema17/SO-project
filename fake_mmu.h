@@ -19,7 +19,7 @@
 #define PAGES_NUM  (1<<PAGE_NBITS)
 
 #define FRAME_NBITS 12 //(ADDRESS_NBITS-PAGE_NBITS)
-		    
+
 
 // size of a memory page
 #define PAGE_SIZE (1<<FRAME_NBITS)
@@ -46,17 +46,14 @@ typedef struct MMU {
   PageEntry *pages;
   uint32_t num_pages;
   char* ram;
+  int busyFramesInRam;  // number of frames in ram that are currently in use
   PageEntry* pagesInRam;  // Pages stored in RAM, on which the second chance algorithm will be performed
-  uint32_t used_memory; // Memory used counter
   FILE* swap_file;
   int pointer;  // To put out
   int pageFault;
 } MMU;
 
 typedef uint32_t PhysicalAddress;
-
-// applies pagination to an address and returns the physical address
-PhysicalAddress getPhysicalAddress(MMU* mmu, LinearAddress linear_address);
 
 MMU* init_MMU(uint32_t num_pages, const char* swap_file);
 
@@ -68,14 +65,14 @@ void printRam(MMU* mmu);
 
 int isRamFull(MMU* mmu);
 
-char* MMU_readByte(MMU* mmu, int pos);
+char* MMU_readByte(MMU* mmu, LinearAddress pos);
 
-void MMU_writeByte(MMU* mmu, int pos, char c);
+void MMU_writeByte(MMU* mmu, LinearAddress pos, char c);
 
-void MMU_exception(MMU* mmu, int page_number);
+void MMU_exception(MMU* mmu, LinearAddress pos);
 
-void swap_out(MMU* mmu, int frame_number);
+void swap_out(MMU* mmu, int frame_number, int frame_to_swap);
 
-void swap_in(MMU* mmu, int frame_number);
+void swap_in(MMU* mmu, int frame_number, int frame_to_swap);
 
 void cleanup_MMU(MMU* mmu);
